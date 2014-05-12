@@ -20,8 +20,25 @@ public class RestaurantProcessor extends Thread{
     public RestaurantProcessor(Restaurant restaurant) {
         this.cashes = new ArrayList<CashProcessor>();
         clients = new LinkedBlockingDeque<Client>();
-        for (int i = 0; i < restaurant.getSize(); i++){
-            CashProcessor newCash = new CashProcessor(restaurant.getCash(i));
+        ThreadGroup minGroup = new ThreadGroup("min thread");
+        for (int i = 0; i < Settings.minCashesCount; i++){
+            String name = "min cash " + i;
+            CashProcessor newCash = new CashProcessor(minGroup, name, restaurant.getCash(i));
+            newCash.setPriority(MIN_PRIORITY);
+            this.cashes.add(newCash);
+        }
+        ThreadGroup normGroup = new ThreadGroup("norm thread");
+        for (int i = Settings.minCashesCount; i < Settings.minCashesCount + Settings.normalCashesCount; i++){
+            String name = "norm cash " + i;
+            CashProcessor newCash = new CashProcessor(normGroup, name, restaurant.getCash(i));
+            newCash.setPriority(NORM_PRIORITY);
+            this.cashes.add(newCash);
+        }
+        ThreadGroup maxGroup = new ThreadGroup("max thread");
+        for (int i = Settings.minCashesCount + Settings.normalCashesCount; i < restaurant.getSize(); i++){
+            String name = "max cash " + i;
+            CashProcessor newCash = new CashProcessor(maxGroup, name, restaurant.getCash(i));
+            newCash.setPriority(MAX_PRIORITY);
             this.cashes.add(newCash);
         }
     }
@@ -32,11 +49,9 @@ public class RestaurantProcessor extends Thread{
 
     @Override
     public void run() {
-        ExecutorService exec = Executors.newFixedThreadPool(cashes.size());
         for (CashProcessor cash : cashes){
-            exec.execute(cash);
+            cash.start();
         }
-        exec.shutdown();
         QueuesProcessor queuesProcessor = new QueuesProcessor(cashes);
         queuesProcessor.start();
         Iterator<CashProcessor> iterator = cashes.iterator();
@@ -44,7 +59,7 @@ public class RestaurantProcessor extends Thread{
             try{
                 Client client = clients.poll(Settings.timeout, TimeUnit.SECONDS);
                 if (client == null){
-                    exec.awaitTermination(Settings.timeout, TimeUnit.SECONDS);
+                    TimeUnit.SECONDS.sleep(Settings.timeout);
                     for (CashProcessor cash : cashes){
                         Statistics statistics = cash.getStatistics();
                         log.info(String.format("%s served %d in %d", cash.toString(), statistics.getServed(),

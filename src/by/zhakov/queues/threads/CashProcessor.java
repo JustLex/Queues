@@ -21,6 +21,13 @@ public class CashProcessor extends Thread{
         queue = new LinkedBlockingDeque<Client>();
     }
 
+    public CashProcessor(ThreadGroup thGroup, String name, Cash cash){
+        super(thGroup, name);
+        statistics = new Statistics();
+        this.cash = cash;
+        queue = new LinkedBlockingDeque<Client>();
+    }
+
     public Statistics getStatistics() {
         return statistics;
     }
